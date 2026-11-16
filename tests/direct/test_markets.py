@@ -18,7 +18,8 @@ def _deployed(direct_deploy):
 
 
 def _hex(value) -> str:
-    return str(value).lower().replace("0x", "")
+    raw = value.hex() if hasattr(value, "hex") else str(value)
+    return str(raw).lower().replace("0x", "")
 
 
 def test_create_market_records_the_question(direct_vm, direct_deploy, direct_alice):
