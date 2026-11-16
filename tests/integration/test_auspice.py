@@ -37,6 +37,13 @@ RETRY_PAUSE = 20
 WINDOW = 60
 STAKE = 100
 URL = "https://raw.githubusercontent.com/weels007/genlayer-vow/main/README.md"
+# A page whose whole text folds to nineteen letters, one short of what a quote
+# needs: no reading taken from it can ground, so a market filed against it can
+# never be settled and has to be voided.
+UNGROUNDABLE_URL = (
+    "https://raw.githubusercontent.com/weels007/genlayer-auspice/main/"
+    "testdata/ungroundable.txt"
+)
 QUESTION = (
     "Does the page say the project is an Intelligent Contract for GenLayer that "
     "reads evidence from the web?"
@@ -179,14 +186,14 @@ def _invariant_holds(client, contract) -> bool:
     return int(ledger["total_in"]) == int(ledger["total_out"]) + int(ledger["locked_total"])
 
 
-def _create_market(client, account, contract, ref):
+def _create_market(client, account, contract, ref, url=URL):
     before = len(_market_ids(client, contract))
     _expect_ok(
         client,
         account,
         contract,
         "create_market",
-        [QUESTION, URL, "", int(WINDOW), f"{ref}-{RUN}"],
+        [QUESTION, url, "", int(WINDOW), f"{ref}-{RUN}"],
         verify=lambda: len(_market_ids(client, contract)) > before,
     )
     ids = _market_ids(client, contract)
@@ -282,6 +289,13 @@ def test_04_the_committee_reads_the_page_and_the_winner_is_paid(
         record = _market(client, contract, market_id)
         assert record["status"] == "VOID", record
 
+    if record["status"] == "RESOLVED":
+        winner = account if record["outcome"] == "YES" else second
+        preview = _read(
+            client, contract, "get_payout_preview", [market_id, winner.address]
+        )
+        assert int(preview["payout"]) == pool, preview
+
     out_before = int(_ledger(client, contract)["total_out"])
     locked_before = int(_ledger(client, contract)["locked_total"])
 
@@ -298,3 +312,54 @@ def test_04_the_committee_reads_the_page_and_the_winner_is_paid(
         print(f"  the {record['outcome']} side took the {pool} GEN pool ({_hex(winner.address)[:8]})")
     else:
         print("  the market was voided and both stakes came back")
+
+
+def test_05_an_undecidable_market_is_voided(client, account, second, contract):
+    """A page no quote can be grounded in: three readings, then both stakes back."""
+    market_id = _create_market(client, account, contract, "live-void", url=UNGROUNDABLE_URL)
+
+    _expect_ok(client, account, contract, "buy", [market_id, "YES", f"yes-{RUN}"], value=STAKE)
+    _expect_ok(client, second, contract, "buy", [market_id, "NO", f"no-{RUN}"], value=STAKE)
+
+    time.sleep(WINDOW + 5)
+
+    for _ in range(3):
+        if int(_market(client, contract, market_id)["attempts"]) >= 3:
+            break
+        _expect_ok(
+            client,
+            account,
+            contract,
+            "resolve",
+            [market_id],
+            verify=lambda: int(_market(client, contract, market_id)["attempts"]) > 0,
+        )
+
+    record = _market(client, contract, market_id)
+    assert record["status"] == "OPEN", record
+    assert int(record["attempts"]) == 3, record
+    assert record["outcome"] == "", record
+
+    # Anyone may void it, so the account that did not create it does.
+    _expect_ok(
+        client,
+        second,
+        contract,
+        "void_market",
+        [market_id],
+        verify=lambda: _market(client, contract, market_id)["status"] == "VOID",
+    )
+    assert _market(client, contract, market_id)["status"] == "VOID"
+
+    out_before = int(_ledger(client, contract)["total_out"])
+    locked_before = int(_ledger(client, contract)["locked_total"])
+
+    _expect_ok(client, account, contract, "claim", [market_id])
+    _expect_ok(client, second, contract, "claim", [market_id])
+
+    ledger = _ledger(client, contract)
+    assert int(ledger["total_out"]) == out_before + 2 * STAKE
+    assert int(ledger["locked_total"]) == locked_before - 2 * STAKE
+    assert _invariant_holds(client, contract)
+
+    print("  three readings settled nothing; the market was voided and refunded")
