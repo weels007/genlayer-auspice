@@ -21,8 +21,12 @@ on:
 
   workflow_dispatch:
 
+# Shared with the Studio suite: both drive the same deployed market, so they must
+# not open markets and buy at the same time. Without this, a run that picks the
+# newest market id can pick the other suite's market, which already holds a
+# position.
 concurrency:
-  group: e2e
+  group: live-suite
   cancel-in-progress: false
 
 jobs:
