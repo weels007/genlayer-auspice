@@ -3,6 +3,9 @@ name: Deploy Contract
 # Deploys Auspice once and records the address in deployment.json. The contract
 # has no constructor arguments and no owner, so a push that does not change the
 # source reuses the recorded deployment.
+#
+# The wallet secrets are this repository's own: a new repository starts with none,
+# even when the same account is filed under another repository's prefix.
 
 on:
   workflow_dispatch:
