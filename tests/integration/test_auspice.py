@@ -181,6 +181,26 @@ def _ledger(client, contract):
     return _read(client, contract, "get_ledger")
 
 
+def _balance(client, contract):
+    return int(_read(client, contract, "get_balance"))
+
+
+def _wait_balance_drop(client, contract, before, amount, attempts=30, step=5):
+    """Wait until the contract's real balance has fallen by exactly `amount`.
+
+    An outgoing transfer is an external message that finalises after the call
+    that emitted it, so the balance read straight after a claim still shows the
+    money inside the contract. Polling is the only way to see it leave.
+    """
+    last = _balance(client, contract)
+    for _ in range(attempts):
+        if before - last == amount:
+            return last
+        time.sleep(step)
+        last = _balance(client, contract)
+    return last
+
+
 def _invariant_holds(client, contract) -> bool:
     ledger = _ledger(client, contract)
     return int(ledger["total_in"]) == int(ledger["total_out"]) + int(ledger["locked_total"])
@@ -298,6 +318,7 @@ def test_04_the_committee_reads_the_page_and_the_winner_is_paid(
 
     out_before = int(_ledger(client, contract)["total_out"])
     locked_before = int(_ledger(client, contract)["locked_total"])
+    balance_before = _balance(client, contract)
 
     _expect_ok(client, account, contract, "claim", [market_id])
     _expect_ok(client, second, contract, "claim", [market_id])
@@ -306,6 +327,12 @@ def test_04_the_committee_reads_the_page_and_the_winner_is_paid(
     assert int(ledger["total_out"]) == out_before + pool
     assert int(ledger["locked_total"]) == locked_before - pool
     assert _invariant_holds(client, contract)
+
+    landed = _wait_balance_drop(client, contract, balance_before, pool)
+    assert balance_before - landed == pool, (
+        "the ledger says the pool was paid, but it never left the contract: "
+        f"{balance_before} -> {landed}"
+    )
 
     if record["status"] == "RESOLVED":
         winner = account if record["outcome"] == "YES" else second
@@ -353,6 +380,7 @@ def test_05_an_undecidable_market_is_voided(client, account, second, contract):
 
     out_before = int(_ledger(client, contract)["total_out"])
     locked_before = int(_ledger(client, contract)["locked_total"])
+    balance_before = _balance(client, contract)
 
     _expect_ok(client, account, contract, "claim", [market_id])
     _expect_ok(client, second, contract, "claim", [market_id])
@@ -361,5 +389,11 @@ def test_05_an_undecidable_market_is_voided(client, account, second, contract):
     assert int(ledger["total_out"]) == out_before + 2 * STAKE
     assert int(ledger["locked_total"]) == locked_before - 2 * STAKE
     assert _invariant_holds(client, contract)
+
+    refunded = _wait_balance_drop(client, contract, balance_before, 2 * STAKE)
+    assert balance_before - refunded == 2 * STAKE, (
+        "the ledger says both stakes were refunded, but the money never left "
+        f"the contract: {balance_before} -> {refunded}"
+    )
 
     print("  three readings settled nothing; the market was voided and refunded")

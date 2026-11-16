@@ -31,7 +31,7 @@ and fails if the contract has drifted from the recorded address.
 | Suite | Proves |
 |---|---|
 | **Direct**, in memory | opening guards, both pools, the one-side rule, every refusal as a credit, all three readings, the proportional payout with its rounding rule, the void path, and the ledger invariant |
-| **Studio**, live | a real market opened, two sides backed by two wallets, the committee reading the frozen page after the close, the payout claimed by both sides, and a market filed against `testdata/ungroundable.txt` that books three undecided readings, is voided by the other account, and refunds both stakes |
+| **Studio**, live | a real market opened, two sides backed by two wallets, the committee reading the frozen page after the close, the payout claimed by both sides, and a market filed against `testdata/ungroundable.txt` that books three undecided readings, is voided by the other account, and refunds both stakes. Each payout is asserted twice: on the ledger, and on the contract's real balance after the transfer finalises |
 | **Money paths**, live | a stake below the floor, a wrong side, a duplicate reference, a claim before settlement, a void before it is earned, a stranger reaching for somebody else's credit, and the views agreeing with the ledger |
 | **Lint** | `genvm-lint check contracts/Auspice.py` |
 
