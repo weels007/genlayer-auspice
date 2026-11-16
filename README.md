@@ -39,7 +39,7 @@ commits it back to `main`.
 
 | | |
 |---|---|
-| **Contract** | see `deployment.json` — written by the Deploy Contract workflow |
+| **Contract** | [`0xce62214444a073A7B4C18563D7f3F20AdD815401`](https://explorer-studio.genlayer.com/address/0xce62214444a073A7B4C18563D7f3F20AdD815401) |
 | **Network** | GenLayer Studio — chainId `61999` (`0xf22f`), test GEN only |
 | **Evidence** | [Actions](https://github.com/weels007/genlayer-auspice/actions) — direct, Studio, money paths, every deployment |
 

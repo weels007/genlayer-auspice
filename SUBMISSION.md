@@ -18,7 +18,7 @@ account may add to its side but never back both.
 | | |
 |---|---|
 | Network | GenLayer Studio — chainId `61999` (`0xf22f`) |
-| Contract | see `deployment.json` — written by the Deploy Contract workflow |
+| Contract | [`0xce62214444a073A7B4C18563D7f3F20AdD815401`](https://explorer-studio.genlayer.com/address/0xce62214444a073A7B4C18563D7f3F20AdD815401) |
 | Source revision | the first twelve characters of the SHA-256 of `contracts/Auspice.py`, recorded with the address |
 | Owner | none: no pause, no setter, no admin, no upgrade path |
 | Money | test GEN only |
