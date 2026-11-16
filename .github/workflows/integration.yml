@@ -1,0 +1,76 @@
+name: Integration (studionet)
+
+# Real-network check against the PINNED market in deployment.json: a market
+# opened, two sides backed, the committee reading the frozen page after the
+# close, a payout claimed, and the refusals.
+#
+# Needs a wallet pair: AUSPICE_DEPLOYER_KEYSTORE / AUSPICE_DEPLOYER_PASSWORD, or
+# the same pair under the ASSIZE_, SURETY_ or GAUNTLET_ prefix. A second pair
+# makes the two-sided cases run with two real wallets.
+
+on:
+  workflow_dispatch:
+
+  workflow_run:
+    workflows: ["Deploy Contract"]
+    types: [completed]
+
+  push:
+    paths:
+      - "tests/integration/**"
+      - "deployment.json"
+      - ".github/workflows/integration.yml"
+
+concurrency:
+  group: live-suite
+  cancel-in-progress: false
+
+jobs:
+  studionet:
+    name: Studio-mode tests
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A workflow_run checks out the commit that triggered the deploy, which
+          # is older than the deployment.json the deploy job commits.
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+
+      - name: Check the wallet secrets
+        id: secrets
+        run: |
+          if [ -z "${{ secrets.AUSPICE_DEPLOYER_KEYSTORE }}" ] && [ -z "${{ secrets.ASSIZE_DEPLOYER_KEYSTORE }}" ] && [ -z "${{ secrets.SURETY_DEPLOYER_KEYSTORE }}" ] && [ -z "${{ secrets.GAUNTLET_DEPLOYER_KEYSTORE }}" ]; then
+            echo "::notice title=Studio suite skipped::Add AUSPICE_DEPLOYER_KEYSTORE and AUSPICE_DEPLOYER_PASSWORD (or one of the sibling prefixes)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Studio suite
+        if: ${{ steps.secrets.outputs.skip != 'true' }}
+        env:
+          AUSPICE_DEPLOYER_KEYSTORE: ${{ secrets.AUSPICE_DEPLOYER_KEYSTORE }}
+          AUSPICE_DEPLOYER_PASSWORD: ${{ secrets.AUSPICE_DEPLOYER_PASSWORD }}
+          ASSIZE_DEPLOYER_KEYSTORE: ${{ secrets.ASSIZE_DEPLOYER_KEYSTORE }}
+          ASSIZE_DEPLOYER_PASSWORD: ${{ secrets.ASSIZE_DEPLOYER_PASSWORD }}
+          SURETY_DEPLOYER_KEYSTORE: ${{ secrets.SURETY_DEPLOYER_KEYSTORE }}
+          SURETY_DEPLOYER_PASSWORD: ${{ secrets.SURETY_DEPLOYER_PASSWORD }}
+          GAUNTLET_DEPLOYER_KEYSTORE: ${{ secrets.GAUNTLET_DEPLOYER_KEYSTORE }}
+          GAUNTLET_DEPLOYER_PASSWORD: ${{ secrets.GAUNTLET_DEPLOYER_PASSWORD }}
+          AUSPICE_TESTER2_KEYSTORE: ${{ secrets.AUSPICE_TESTER2_KEYSTORE }}
+          AUSPICE_TESTER2_PASSWORD: ${{ secrets.AUSPICE_TESTER2_PASSWORD }}
+          AUSPICE_TESTER_KEYSTORE2: ${{ secrets.AUSPICE_TESTER_KEYSTORE2 }}
+          AUSPICE_TESTER_PASSWORD2: ${{ secrets.AUSPICE_TESTER_PASSWORD2 }}
+          ASSIZE_TESTER2_KEYSTORE: ${{ secrets.ASSIZE_TESTER2_KEYSTORE }}
+          ASSIZE_TESTER2_PASSWORD: ${{ secrets.ASSIZE_TESTER2_PASSWORD }}
+          ASSIZE_TESTER_KEYSTORE2: ${{ secrets.ASSIZE_TESTER_KEYSTORE2 }}
+          ASSIZE_TESTER_PASSWORD2: ${{ secrets.ASSIZE_TESTER_PASSWORD2 }}
+          SURETY_TESTER2_KEYSTORE: ${{ secrets.SURETY_TESTER2_KEYSTORE }}
+          SURETY_TESTER2_PASSWORD: ${{ secrets.SURETY_TESTER2_PASSWORD }}
+          GAUNTLET_TESTER2_KEYSTORE: ${{ secrets.GAUNTLET_TESTER2_KEYSTORE }}
+          GAUNTLET_TESTER2_PASSWORD: ${{ secrets.GAUNTLET_TESTER2_PASSWORD }}
+        run: pytest tests/integration -v -s -rs

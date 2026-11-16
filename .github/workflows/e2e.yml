@@ -1,0 +1,77 @@
+name: E2E
+
+# The money paths that need no model, against the deployed market: a stake below
+# the floor, a wrong side, a second side for the same account, a duplicate
+# reference, a claim before the market settles, a void before it is earned, and
+# the credit a refused buy leaves behind.
+#
+# No model is called here.
+
+on:
+  push:
+    paths:
+      - "tests/e2e/**"
+      - "scripts/**"
+      - "deployment.json"
+      - ".github/workflows/e2e.yml"
+
+  workflow_run:
+    workflows: ["Deploy Contract"]
+    types: [completed]
+
+  workflow_dispatch:
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
+
+jobs:
+  e2e:
+    name: E2E (deployed contract)
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && 'main' || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+
+      - name: The deployed contract is this source
+        run: python scripts/verify_deployment.py
+
+      - name: Check the wallet secrets
+        id: secrets
+        run: |
+          if [ -z "${{ secrets.AUSPICE_DEPLOYER_KEYSTORE }}" ] && [ -z "${{ secrets.ASSIZE_DEPLOYER_KEYSTORE }}" ] && [ -z "${{ secrets.SURETY_DEPLOYER_KEYSTORE }}" ] && [ -z "${{ secrets.GAUNTLET_DEPLOYER_KEYSTORE }}" ]; then
+            echo "::notice title=E2E skipped::Add AUSPICE_DEPLOYER_KEYSTORE and AUSPICE_DEPLOYER_PASSWORD (or one of the sibling prefixes)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: End to end
+        if: ${{ steps.secrets.outputs.skip != 'true' }}
+        env:
+          AUSPICE_DEPLOYER_KEYSTORE: ${{ secrets.AUSPICE_DEPLOYER_KEYSTORE }}
+          AUSPICE_DEPLOYER_PASSWORD: ${{ secrets.AUSPICE_DEPLOYER_PASSWORD }}
+          ASSIZE_DEPLOYER_KEYSTORE: ${{ secrets.ASSIZE_DEPLOYER_KEYSTORE }}
+          ASSIZE_DEPLOYER_PASSWORD: ${{ secrets.ASSIZE_DEPLOYER_PASSWORD }}
+          SURETY_DEPLOYER_KEYSTORE: ${{ secrets.SURETY_DEPLOYER_KEYSTORE }}
+          SURETY_DEPLOYER_PASSWORD: ${{ secrets.SURETY_DEPLOYER_PASSWORD }}
+          GAUNTLET_DEPLOYER_KEYSTORE: ${{ secrets.GAUNTLET_DEPLOYER_KEYSTORE }}
+          GAUNTLET_DEPLOYER_PASSWORD: ${{ secrets.GAUNTLET_DEPLOYER_PASSWORD }}
+          AUSPICE_TESTER2_KEYSTORE: ${{ secrets.AUSPICE_TESTER2_KEYSTORE }}
+          AUSPICE_TESTER2_PASSWORD: ${{ secrets.AUSPICE_TESTER2_PASSWORD }}
+          AUSPICE_TESTER_KEYSTORE2: ${{ secrets.AUSPICE_TESTER_KEYSTORE2 }}
+          AUSPICE_TESTER_PASSWORD2: ${{ secrets.AUSPICE_TESTER_PASSWORD2 }}
+          ASSIZE_TESTER2_KEYSTORE: ${{ secrets.ASSIZE_TESTER2_KEYSTORE }}
+          ASSIZE_TESTER2_PASSWORD: ${{ secrets.ASSIZE_TESTER2_PASSWORD }}
+          ASSIZE_TESTER_KEYSTORE2: ${{ secrets.ASSIZE_TESTER_KEYSTORE2 }}
+          ASSIZE_TESTER_PASSWORD2: ${{ secrets.ASSIZE_TESTER_PASSWORD2 }}
+          SURETY_TESTER2_KEYSTORE: ${{ secrets.SURETY_TESTER2_KEYSTORE }}
+          SURETY_TESTER2_PASSWORD: ${{ secrets.SURETY_TESTER2_PASSWORD }}
+          GAUNTLET_TESTER2_KEYSTORE: ${{ secrets.GAUNTLET_TESTER2_KEYSTORE }}
+          GAUNTLET_TESTER2_PASSWORD: ${{ secrets.GAUNTLET_TESTER2_PASSWORD }}
+        run: pytest tests/e2e -v -s -rs
