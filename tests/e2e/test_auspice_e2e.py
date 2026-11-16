@@ -336,7 +336,38 @@ def test_08_a_stranger_cannot_take_somebody_elses_credit(
     _expect_ok(client, account, contract, "withdraw_credit")
 
 
-def test_09_views_agree_with_the_ledger(client, contract):
+def test_09_a_second_side_on_the_same_market_is_a_credit(
+    client, account, contract
+):
+    market_id = _create_market(client, account, contract, "e2e-conflict")
+
+    _expect_ok(
+        client, account, contract, "buy", [market_id, "YES", f"yes-{RUN}"], value=100
+    )
+
+    refused = _buy(client, account, contract, market_id, "NO", 50, "no")
+
+    assert refused == 50
+    assert _position(client, contract, market_id, account)["side"] == "YES"
+    assert _market(client, contract, market_id)["no_pool"] == 0
+    _expect_ok(client, account, contract, "withdraw_credit")
+
+
+def test_10_a_position_above_the_cap_is_a_credit(client, account, contract):
+    market_id = _create_market(client, account, contract, "e2e-cap")
+
+    _expect_ok(
+        client, account, contract, "buy", [market_id, "YES", f"fill-{RUN}"], value=10000
+    )
+
+    refused = _buy(client, account, contract, market_id, "YES", 10, "over")
+
+    assert refused == 10
+    assert _position(client, contract, market_id, account)["stake"] == 10000
+    _expect_ok(client, account, contract, "withdraw_credit")
+
+
+def test_11_views_agree_with_the_ledger(client, contract):
     summary = _read(client, contract, "get_summary")
     markets = _read(client, contract, "get_markets")
 

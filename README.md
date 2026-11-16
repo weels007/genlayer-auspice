@@ -162,7 +162,7 @@ Residual risks, stated plainly:
 |---|---|---|
 | **Direct** | opening, every refusal, the two pools, the one-side rule, all three readings, the proportional payout, the dust rule, the void path and the ledger invariant | `pytest tests/direct -v` |
 | **Studio** | the deployed market: a real market opened, two sides backed, a live reading after the close, the payout, and a second market filed against an ungroundable page that books three undecided readings, is voided by the other account, and refunds both stakes | `pytest tests/integration -v -s` |
-| **End to end** | the paths that need no model: a stake below the floor, a wrong side, a duplicate reference, a claim before settlement, a void before it is earned, and a stranger reaching for a credit | `pytest tests/e2e -v -s` |
+| **End to end** | the paths that need no model: a stake below the floor, a wrong side, a duplicate reference, a second side for the same account, a position above its cap, a claim before settlement, a void before it is earned, and a stranger reaching for a credit | `pytest tests/e2e -v -s` |
 
 Every assertion in the live suites is a delta, and every reference carries the
 run's start time, so they can be re-run against the same market.
